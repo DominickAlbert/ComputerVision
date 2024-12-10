@@ -5,6 +5,8 @@ import numpy as np
 from tensorflow.keras.models import load_model
 from scipy.cluster.vq import vq
 import pickle  # To save and load the BoW model (KMeans)
+import time  # For managing the update interval
+
 
 # Load the trained neural network model
 model = load_model('garbage_classification_model.h5')
@@ -35,7 +37,11 @@ def compute_histogram_from_frame(frame, kmeans):
 label_mapping = {0: "Cardboard", 1: "Glass", 2: "Metal", 3: "Paper", 4: "Plastic", 5: "Trash"}
 
 # Open the camera
-cap = cv2.VideoCapture(0)  # Use 0 for the default camera
+cap = cv2.VideoCapture(1)  # Use 0 for the default camera
+# Variables for controlling label update frequency
+last_update_time = time.time()
+update_interval = 1.0  # Update label every 1 second
+current_label = "Detecting..."
 
 while True:
     ret, frame = cap.read()
@@ -46,13 +52,15 @@ while True:
     histogram = compute_histogram_from_frame(frame, kmeans)
     histogram = histogram.reshape(1, -1)  # Reshape for the model
 
-    # Predict the class using the trained model
-    predictions = model.predict(histogram)
-    predicted_label = np.argmax(predictions)  # Get the class index
-    label = label_mapping[predicted_label]
+    # Update the label only if enough time has passed
+    if time.time() - last_update_time > update_interval:
+        predictions = model.predict(histogram)
+        predicted_label = np.argmax(predictions)  # Get the class index
+        current_label = label_mapping[predicted_label]
+        last_update_time = time.time()
 
     # Display the prediction on the video feed
-    cv2.putText(frame, f"Prediction: {label}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv2.putText(frame, f"Prediction: {current_label}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
     cv2.imshow('Garbage Classification', frame)
 
     # Exit on pressing 'q'
@@ -62,3 +70,4 @@ while True:
 # Release the camera and close all OpenCV windows
 cap.release()
 cv2.destroyAllWindows()
+
